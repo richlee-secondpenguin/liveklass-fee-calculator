@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liveklass 수수료 계산기 (26년도 개편안)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: white; text-align: center; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { color: rgba(255,255,255,0.8); text-align: center; margin-bottom: 30px; font-size: 14px; }
+        .card { background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+        .card-title { font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .card-title .icon { width: 24px; height: 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; font-size: 14px; font-weight: 600; color: #4a4a4a; margin-bottom: 8px; }
+        .input-group input { width: 100%; padding: 14px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; transition: all 0.3s; }
+        .input-group input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+        .rate-selector { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .rate-option { padding: 16px 12px; border: 2px solid #e0e0e0; border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.3s; background: white; }
+        .rate-option:hover { border-color: #667eea; background: #f8f9ff; }
+        .rate-option.selected { border-color: #667eea; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .rate-option .rate-value { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+        .rate-option .rate-label { font-size: 12px; opacity: 0.8; }
+        .rate-option.selected .rate-label { color: rgba(255,255,255,0.9); }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #f8f9fa; border-radius: 10px; cursor: pointer; }
+        .checkbox-group input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
+        .checkbox-group label { font-size: 14px; color: #4a4a4a; cursor: pointer; }
+        .btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .result-card { background: #f8f9fa; border-radius: 12px; padding: 20px; position: relative; overflow: hidden; }
+        .result-card.highlight { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .result-card.highlight .result-label { color: rgba(255,255,255,0.8); }
+        .result-card .tag { position: absolute; top: 12px; right: 12px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+        .tag.old { background: #fee2e2; color: #dc2626; }
+        .tag.new { background: #dcfce7; color: #16a34a; }
+        .tag.best { background: rgba(255,255,255,0.2); color: white; }
+        .result-label { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+        .result-value { font-size: 28px; font-weight: 700; }
+        .result-sub { font-size: 13px; margin-top: 8px; opacity: 0.8; }
+        .breakdown-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        .breakdown-table th, .breakdown-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        .breakdown-table th { background: #f9fafb; font-weight: 600; color: #374151; }
+        .breakdown-table tr:last-child td { border-bottom: none; font-weight: 600; background: #f0f9ff; }
+        .savings-badge { display: inline-block; padding: 8px 16px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 20px; font-weight: 600; font-size: 14px; margin-top: 16px; }
+        .customer-output { background: #1a1a2e; color: #e5e7eb; border-radius: 12px; padding: 20px; font-family: monospace; font-size: 13px; line-height: 1.8; white-space: pre-wrap; position: relative; }
+        .copy-btn { position: absolute; top: 12px; right: 12px; padding: 8px 16px; background: #374151; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; transition: background 0.2s; }
+        .copy-btn:hover { background: #4b5563; }
+        .hidden { display: none; }
+        .info-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; border-radius: 0 8px 8px 0; margin-bottom: 20px; }
+        .info-box p { font-size: 14px; color: #1e40af; line-height: 1.6; }
+        .section-label { font-size: 14px; font-weight: 600; color: #4a4a4a; margin-bottom: 12px; }
+        @media (max-width: 768px) { .rate-selector { grid-template-columns: repeat(2, 1fr); } h1 { font-size: 22px; } .result-value { font-size: 24px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Liveklass 수수료 계산기</h1>
+        <p class="subtitle">26년도 개편안 기준 | 기존 vs 개편안 비교 및 복합 적용 계산</p>
+        <div class="card">
+            <div class="card-title"><span class="icon">1</span>거래 정보 입력</div>
+            <div class="input-group">
+                <label>월 거래액 (원)</label>
+                <input type="text" id="monthlyAmount" placeholder="예: 150,000,000" oninput="formatNumber(this)">
+            </div>
+            <div class="section-label">기본 수수료율 선택 (누적 거래액 기반)</div>
+            <div class="rate-selector">
+                <div class="rate-option selected" data-rate="0.05" onclick="selectRate(this)"><div class="rate-value">5%</div><div class="rate-label">기본</div></div>
+                <div class="rate-option" data-rate="0.04" onclick="selectRate(this)"><div class="rate-value">4%</div><div class="rate-label">5억 달성</div></div>
+                <div class="rate-option" data-rate="0.03" onclick="selectRate(this)"><div class="rate-value">3%</div><div class="rate-label">20억 달성</div></div>
+                <div class="rate-option" data-rate="0.02" onclick="selectRate(this)"><div class="rate-value">2%</div><div class="rate-label">60억 달성</div></div>
+            </div>
+            <div class="checkbox-group" onclick="toggleCheckbox('useComposite')">
+                <input type="checkbox" id="useComposite" checked>
+                <label for="useComposite">복합 적용 계산 (기본 수수료율 + 구간별 할인)</label>
+            </div>
+            <div style="margin-top: 20px;"><button class="btn" onclick="calculate()">수수료 계산하기</button></div>
+        </div>
+        <div id="resultSection" class="hidden">
+            <div class="card">
+                <div class="card-title"><span class="icon">2</span>계산 결과 요약</div>
+                <div class="results-grid">
+                    <div class="result-card"><span class="tag old">기존</span><div class="result-label">기존 구간별 할인 (5개 구간)</div><div class="result-value" id="oldTierFee">-</div><div class="result-sub" id="oldTierRate">실효 수수료율: -</div></div>
+                    <div class="result-card"><span class="tag new">개편</span><div class="result-label">개편 구간별 할인 (3개 구간)</div><div class="result-value" id="newTierFee">-</div><div class="result-sub" id="newTierRate">실효 수수료율: -</div></div>
+                    <div class="result-card highlight" id="compositeFeeCard"><span class="tag best">최적</span><div class="result-label" id="compositeLabel">개편 복합 적용</div><div class="result-value" id="compositeFee">-</div><div class="result-sub" id="compositeRate">실효 수수료율: -</div></div>
+                </div>
+                <div id="savingsSection" style="text-align: center; margin-top: 20px;"><span class="savings-badge" id="savingsBadge">-</span></div>
+            </div>
+            <div class="card">
+                <div class="card-title"><span class="icon">3</span>구간별 상세 내역</div>
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 15px; color: #374151; margin-bottom: 12px;">기존 구간별 할인 (5개 구간)</h4>
+                    <table class="breakdown-table" id="oldTierTable"><thead><tr><th>구간</th><th>대상 금액</th><th>수수료율</th><th>수수료</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div style="margin-bottom: 24px;">
+                    <h4 style="font-size: 15px; color: #374151; margin-bottom: 12px;">개편 구간별 할인 (3개 구간, 기본 5% 기준)</h4>
+                    <table class="breakdown-table" id="newTierTable"><thead><tr><th>구간</th><th>대상 금액</th><th>수수료율</th><th>수수료</th></tr></thead><tbody></tbody></table>
+                </div>
+                <div id="compositeSection">
+                    <h4 style="font-size: 15px; color: #374151; margin-bottom: 12px;" id="compositeTableTitle">개편 복합 적용</h4>
+                    <div class="info-box"><p id="compositeInfo">기본 수수료율에 구간별 할인을 추가 적용합니다.</p></div>
+                    <table class="breakdown-table" id="compositeTable"><thead><tr><th>구간</th><th>대상 금액</th><th>기본 수수료율</th><th>할인 적용</th><th>최종 수수료율</th><th>수수료</th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title"><span class="icon">4</span>고객 안내용 요약</div>
+                <div class="customer-output" id="customerOutput"><button class="copy-btn" onclick="copyToClipboard()">복사</button>계산 결과가 여기에 표시됩니다.</div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let selectedRate = 0.05;
+        let selectedRateLabel = '기본';
+        function selectRate(element) { document.querySelectorAll('.rate-option').forEach(el => el.classList.remove('selected')); element.classList.add('selected'); selectedRate = parseFloat(element.dataset.rate); selectedRateLabel = element.querySelector('.rate-label').textContent; }
+        function formatNumber(input) { let value = input.value.replace(/[^d]/g, ''); if (value) { value = parseInt(value).toLocaleString('ko-KR'); } input.value = value; }
+        function parseNumber(str) { return parseInt(str.replace(/[^d]/g, '')) || 0; }
+        function toggleCheckbox(id) { const checkbox = document.getElementById(id); checkbox.checked = !checkbox.checked; }
+        function formatCurrency(amount) { return '₩' + Math.round(amount).toLocaleString('ko-KR'); }
+        function formatPercent(rate) { return (rate * 100).toFixed(2) + '%'; }
+        function calculateOldTier(amount) { const tiers = [{ name: '3천만원 미만', max: 30000000, rate: 0.05 },{ name: '3천만~5천만원', max: 50000000, rate: 0.045 },{ name: '5천만~1억원', max: 100000000, rate: 0.04 },{ name: '1억~3억원', max: 300000000, rate: 0.035 },{ name: '3억원 초과', max: Infinity, rate: 0.025 }]; let remaining = amount; let totalFee = 0; let breakdown = []; let prevMax = 0; for (const tier of tiers) { if (remaining <= 0) break; const tierAmount = Math.min(remaining, tier.max - prevMax); const fee = tierAmount * tier.rate; if (tierAmount > 0) { breakdown.push({ name: tier.name, amount: tierAmount, rate: tier.rate, fee: fee }); totalFee += fee; remaining -= tierAmount; } prevMax = tier.max; } return { totalFee, breakdown, effectiveRate: totalFee / amount }; }
+        function calculateNewTier(amount, baseRate = 0.05) { const tiers = [{ name: '1천만원 미만', max: 10000000, discount: 0 },{ name: '1천만~1억원', max: 100000000, discount: 0.3 },{ name: '1억원 초과', max: Infinity, discount: 0.5 }]; let remaining = amount; let totalFee = 0; let breakdown = []; let prevMax = 0; for (const tier of tiers) { if (remaining <= 0) break; const tierAmount = Math.min(remaining, tier.max - prevMax); const effectiveRate = baseRate * (1 - tier.discount); const fee = tierAmount * effectiveRate; if (tierAmount > 0) { breakdown.push({ name: tier.name, amount: tierAmount, baseRate: baseRate, discount: tier.discount, effectiveRate: effectiveRate, fee: fee }); totalFee += fee; remaining -= tierAmount; } prevMax = tier.max; } return { totalFee, breakdown, effectiveRate: totalFee / amount }; }
+        function calculate() { const monthlyAmount = parseNumber(document.getElementById('monthlyAmount').value); const useComposite = document.getElementById('useComposite').checked; if (monthlyAmount <= 0) { alert('월 거래액을 입력해주세요.'); return; } document.getElementById('resultSection').classList.remove('hidden'); const oldResult = calculateOldTier(monthlyAmount); document.getElementById('oldTierFee').textContent = formatCurrency(oldResult.totalFee); document.getElementById('oldTierRate').textContent = '실효 수수료율: ' + formatPercent(oldResult.effectiveRate); const oldTableBody = document.querySelector('#oldTierTable tbody'); oldTableBody.innerHTML = oldResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.rate)+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>'+formatPercent(oldResult.effectiveRate)+'</td><td>'+formatCurrency(oldResult.totalFee)+'</td></tr>'; const newResult = calculateNewTier(monthlyAmount, 0.05); document.getElementById('newTierFee').textContent = formatCurrency(newResult.totalFee); document.getElementById('newTierRate').textContent = '실효 수수료율: ' + formatPercent(newResult.effectiveRate); const newTableBody = document.querySelector('#newTierTable tbody'); newTableBody.innerHTML = newResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.effectiveRate)+(row.discount > 0 ? ' ('+(row.discount*100)+'% 할인)' : '')+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>'+formatPercent(newResult.effectiveRate)+'</td><td>'+formatCurrency(newResult.totalFee)+'</td></tr>'; let compositeResult = null; if (useComposite) { compositeResult = calculateNewTier(monthlyAmount, selectedRate); document.getElementById('compositeLabel').textContent = '개편 복합 적용 (기본 '+(selectedRate*100)+'% + 구간별 할인)'; document.getElementById('compositeFee').textContent = formatCurrency(compositeResult.totalFee); document.getElementById('compositeRate').textContent = '실효 수수료율: ' + formatPercent(compositeResult.effectiveRate); document.getElementById('compositeTableTitle').textContent = '개편 복합 적용 (기본 수수료율: '+(selectedRate*100)+'% - '+selectedRateLabel+')'; document.getElementById('compositeInfo').innerHTML = '<strong>선택한 기본 수수료율:</strong> '+(selectedRate*100)+'% ('+selectedRateLabel+') → 구간별 추가 할인 적용'; const compositeTableBody = document.querySelector('#compositeTable tbody'); compositeTableBody.innerHTML = compositeResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.baseRate)+'</td><td>'+(row.discount > 0 ? (row.discount*100)+'% 할인' : '할인 없음')+'</td><td>'+formatPercent(row.effectiveRate)+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>-</td><td>-</td><td>'+formatPercent(compositeResult.effectiveRate)+'</td><td>'+formatCurrency(compositeResult.totalFee)+'</td></tr>'; document.getElementById('compositeFeeCard').classList.remove('hidden'); document.getElementById('compositeSection').classList.remove('hidden'); } else { document.getElementById('compositeLabel').textContent = '개편 복합 적용'; document.getElementById('compositeFee').textContent = '-'; document.getElementById('compositeRate').textContent = '복합 적용 체크 필요'; document.getElementById('compositeInfo').textContent = '복합 적용을 체크하면 상세 내역이 표시됩니다.'; document.querySelector('#compositeTable tbody').innerHTML = ''; } const baseFee = monthlyAmount * 0.05; const bestFee = compositeResult ? compositeResult.totalFee : newResult.totalFee; const savings = baseFee - bestFee; const savingsPercent = (savings / baseFee * 100).toFixed(1); document.getElementById('savingsBadge').textContent = '기존 5% 단일 적용 대비 ' + formatCurrency(savings) + ' 절감 (' + savingsPercent + '%)'; generateCustomerOutput(monthlyAmount, oldResult, newResult, compositeResult, useComposite); document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' }); }
+        function generateCustomerOutput(monthly, oldResult, newResult, compositeResult, useComposite) { const baseFee = monthly * 0.05; let output = 'Liveklass 수수료 안내
+
+월 거래액: ' + formatCurrency(monthly); if (useComposite && compositeResult) { output += '
+적용 기본 수수료율: ' + (selectedRate * 100) + '% (' + selectedRateLabel + ')'; } output += '
+
+수수료 비교
+기본 5% 적용: ' + formatCurrency(baseFee) + '
+구간별 할인: ' + formatCurrency(newResult.totalFee); if (useComposite && compositeResult) { output += '
+복합 적용: ' + formatCurrency(compositeResult.totalFee); const savings = baseFee - compositeResult.totalFee; output += '
+
+절감 효과: 월 ' + formatCurrency(savings) + ' (연 ' + formatCurrency(savings * 12) + ')'; } else { const savings = baseFee - newResult.totalFee; output += '
+
+절감 효과: 월 ' + formatCurrency(savings) + ' (연 ' + formatCurrency(savings * 12) + ')'; } document.getElementById('customerOutput').innerHTML = '<button class="copy-btn" onclick="copyToClipboard()">복사</button>' + output; }
+        function copyToClipboard() { const output = document.getElementById('customerOutput').textContent.replace('복사', '').trim(); navigator.clipboard.writeText(output).then(() => { const btn = document.querySelector('.copy-btn'); btn.textContent = '복사됨!'; setTimeout(() => btn.textContent = '복사', 2000); }); }
+    </script>
+</body>
+</html>
