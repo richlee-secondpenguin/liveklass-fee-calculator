@@ -111,31 +111,164 @@
         </div>
     </div>
     <script>
-        let selectedRate = 0.05;
-        let selectedRateLabel = '기본';
-        function selectRate(element) { document.querySelectorAll('.rate-option').forEach(el => el.classList.remove('selected')); element.classList.add('selected'); selectedRate = parseFloat(element.dataset.rate); selectedRateLabel = element.querySelector('.rate-label').textContent; }
-        function formatNumber(input) { let value = input.value.replace(/[^d]/g, ''); if (value) { value = parseInt(value).toLocaleString('ko-KR'); } input.value = value; }
-        function parseNumber(str) { return parseInt(str.replace(/[^d]/g, '')) || 0; }
-        function toggleCheckbox(id) { const checkbox = document.getElementById(id); checkbox.checked = !checkbox.checked; }
-        function formatCurrency(amount) { return '₩' + Math.round(amount).toLocaleString('ko-KR'); }
-        function formatPercent(rate) { return (rate * 100).toFixed(2) + '%'; }
-        function calculateOldTier(amount) { const tiers = [{ name: '3천만원 미만', max: 30000000, rate: 0.05 },{ name: '3천만~5천만원', max: 50000000, rate: 0.045 },{ name: '5천만~1억원', max: 100000000, rate: 0.04 },{ name: '1억~3억원', max: 300000000, rate: 0.035 },{ name: '3억원 초과', max: Infinity, rate: 0.025 }]; let remaining = amount; let totalFee = 0; let breakdown = []; let prevMax = 0; for (const tier of tiers) { if (remaining <= 0) break; const tierAmount = Math.min(remaining, tier.max - prevMax); const fee = tierAmount * tier.rate; if (tierAmount > 0) { breakdown.push({ name: tier.name, amount: tierAmount, rate: tier.rate, fee: fee }); totalFee += fee; remaining -= tierAmount; } prevMax = tier.max; } return { totalFee, breakdown, effectiveRate: totalFee / amount }; }
-        function calculateNewTier(amount, baseRate = 0.05) { const tiers = [{ name: '1천만원 미만', max: 10000000, discount: 0 },{ name: '1천만~1억원', max: 100000000, discount: 0.3 },{ name: '1억원 초과', max: Infinity, discount: 0.5 }]; let remaining = amount; let totalFee = 0; let breakdown = []; let prevMax = 0; for (const tier of tiers) { if (remaining <= 0) break; const tierAmount = Math.min(remaining, tier.max - prevMax); const effectiveRate = baseRate * (1 - tier.discount); const fee = tierAmount * effectiveRate; if (tierAmount > 0) { breakdown.push({ name: tier.name, amount: tierAmount, baseRate: baseRate, discount: tier.discount, effectiveRate: effectiveRate, fee: fee }); totalFee += fee; remaining -= tierAmount; } prevMax = tier.max; } return { totalFee, breakdown, effectiveRate: totalFee / amount }; }
-        function calculate() { const monthlyAmount = parseNumber(document.getElementById('monthlyAmount').value); const useComposite = document.getElementById('useComposite').checked; if (monthlyAmount <= 0) { alert('월 거래액을 입력해주세요.'); return; } document.getElementById('resultSection').classList.remove('hidden'); const oldResult = calculateOldTier(monthlyAmount); document.getElementById('oldTierFee').textContent = formatCurrency(oldResult.totalFee); document.getElementById('oldTierRate').textContent = '실효 수수료율: ' + formatPercent(oldResult.effectiveRate); const oldTableBody = document.querySelector('#oldTierTable tbody'); oldTableBody.innerHTML = oldResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.rate)+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>'+formatPercent(oldResult.effectiveRate)+'</td><td>'+formatCurrency(oldResult.totalFee)+'</td></tr>'; const newResult = calculateNewTier(monthlyAmount, 0.05); document.getElementById('newTierFee').textContent = formatCurrency(newResult.totalFee); document.getElementById('newTierRate').textContent = '실효 수수료율: ' + formatPercent(newResult.effectiveRate); const newTableBody = document.querySelector('#newTierTable tbody'); newTableBody.innerHTML = newResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.effectiveRate)+(row.discount > 0 ? ' ('+(row.discount*100)+'% 할인)' : '')+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>'+formatPercent(newResult.effectiveRate)+'</td><td>'+formatCurrency(newResult.totalFee)+'</td></tr>'; let compositeResult = null; if (useComposite) { compositeResult = calculateNewTier(monthlyAmount, selectedRate); document.getElementById('compositeLabel').textContent = '개편 복합 적용 (기본 '+(selectedRate*100)+'% + 구간별 할인)'; document.getElementById('compositeFee').textContent = formatCurrency(compositeResult.totalFee); document.getElementById('compositeRate').textContent = '실효 수수료율: ' + formatPercent(compositeResult.effectiveRate); document.getElementById('compositeTableTitle').textContent = '개편 복합 적용 (기본 수수료율: '+(selectedRate*100)+'% - '+selectedRateLabel+')'; document.getElementById('compositeInfo').innerHTML = '<strong>선택한 기본 수수료율:</strong> '+(selectedRate*100)+'% ('+selectedRateLabel+') → 구간별 추가 할인 적용'; const compositeTableBody = document.querySelector('#compositeTable tbody'); compositeTableBody.innerHTML = compositeResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.baseRate)+'</td><td>'+(row.discount > 0 ? (row.discount*100)+'% 할인' : '할인 없음')+'</td><td>'+formatPercent(row.effectiveRate)+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>-</td><td>-</td><td>'+formatPercent(compositeResult.effectiveRate)+'</td><td>'+formatCurrency(compositeResult.totalFee)+'</td></tr>'; document.getElementById('compositeFeeCard').classList.remove('hidden'); document.getElementById('compositeSection').classList.remove('hidden'); } else { document.getElementById('compositeLabel').textContent = '개편 복합 적용'; document.getElementById('compositeFee').textContent = '-'; document.getElementById('compositeRate').textContent = '복합 적용 체크 필요'; document.getElementById('compositeInfo').textContent = '복합 적용을 체크하면 상세 내역이 표시됩니다.'; document.querySelector('#compositeTable tbody').innerHTML = ''; } const baseFee = monthlyAmount * 0.05; const bestFee = compositeResult ? compositeResult.totalFee : newResult.totalFee; const savings = baseFee - bestFee; const savingsPercent = (savings / baseFee * 100).toFixed(1); document.getElementById('savingsBadge').textContent = '기존 5% 단일 적용 대비 ' + formatCurrency(savings) + ' 절감 (' + savingsPercent + '%)'; generateCustomerOutput(monthlyAmount, oldResult, newResult, compositeResult, useComposite); document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' }); }
-        function generateCustomerOutput(monthly, oldResult, newResult, compositeResult, useComposite) { const baseFee = monthly * 0.05; let output = 'Liveklass 수수료 안내
+    let selectedRate = 0.05;
+    let selectedRateLabel = '기본';
 
-월 거래액: ' + formatCurrency(monthly); if (useComposite && compositeResult) { output += '
-적용 기본 수수료율: ' + (selectedRate * 100) + '% (' + selectedRateLabel + ')'; } output += '
+    function selectRate(element) { 
+        document.querySelectorAll('.rate-option').forEach(el => el.classList.remove('selected')); 
+        element.classList.add('selected'); 
+        selectedRate = parseFloat(element.dataset.rate); 
+        selectedRateLabel = element.querySelector('.rate-label').textContent; 
+    }
 
-수수료 비교
-기본 5% 적용: ' + formatCurrency(baseFee) + '
-구간별 할인: ' + formatCurrency(newResult.totalFee); if (useComposite && compositeResult) { output += '
-복합 적용: ' + formatCurrency(compositeResult.totalFee); const savings = baseFee - compositeResult.totalFee; output += '
+    function formatNumber(input) { 
+        let value = input.value.replace(/[^\\d]/g, ''); 
+        if (value) { 
+            value = parseInt(value).toLocaleString('ko-KR'); 
+        } 
+        input.value = value; 
+    }
 
-절감 효과: 월 ' + formatCurrency(savings) + ' (연 ' + formatCurrency(savings * 12) + ')'; } else { const savings = baseFee - newResult.totalFee; output += '
+    function parseNumber(str) { 
+        return parseInt(str.replace(/[^\\d]/g, '')) || 0; 
+    }
 
-절감 효과: 월 ' + formatCurrency(savings) + ' (연 ' + formatCurrency(savings * 12) + ')'; } document.getElementById('customerOutput').innerHTML = '<button class="copy-btn" onclick="copyToClipboard()">복사</button>' + output; }
-        function copyToClipboard() { const output = document.getElementById('customerOutput').textContent.replace('복사', '').trim(); navigator.clipboard.writeText(output).then(() => { const btn = document.querySelector('.copy-btn'); btn.textContent = '복사됨!'; setTimeout(() => btn.textContent = '복사', 2000); }); }
-    </script>
+    function toggleCheckbox(id) { 
+        const checkbox = document.getElementById(id); 
+        checkbox.checked = !checkbox.checked; 
+    }
+
+    function formatCurrency(amount) { 
+        return '₩' + Math.round(amount).toLocaleString('ko-KR'); 
+    }
+
+    function formatPercent(rate) { 
+        return (rate * 100).toFixed(2) + '%'; 
+    }
+
+    function calculateOldTier(amount) { 
+        const tiers = [
+            { name: '3천만원 미만', max: 30000000, rate: 0.05 },
+            { name: '3천만~5천만원', max: 50000000, rate: 0.045 },
+            { name: '5천만~1억원', max: 100000000, rate: 0.04 },
+            { name: '1억~3억원', max: 300000000, rate: 0.035 },
+            { name: '3억원 초과', max: Infinity, rate: 0.025 }
+        ]; 
+        let remaining = amount; 
+        let totalFee = 0; 
+        let breakdown = []; 
+        let prevMax = 0; 
+        for (const tier of tiers) { 
+            if (remaining <= 0) break; 
+            const tierAmount = Math.min(remaining, tier.max - prevMax); 
+            const fee = tierAmount * tier.rate; 
+            if (tierAmount > 0) { 
+                breakdown.push({ name: tier.name, amount: tierAmount, rate: tier.rate, fee: fee }); 
+                totalFee += fee; 
+                remaining -= tierAmount; 
+            } 
+            prevMax = tier.max; 
+        } 
+        return { totalFee, breakdown, effectiveRate: totalFee / amount }; 
+    }
+
+    function calculateNewTier(amount, baseRate = 0.05) { 
+        const tiers = [
+            { name: '1천만원 미만', max: 10000000, discount: 0 },
+            { name: '1천만~1억원', max: 100000000, discount: 0.3 },
+            { name: '1억원 초과', max: Infinity, discount: 0.5 }
+        ]; 
+        let remaining = amount; 
+        let totalFee = 0; 
+        let breakdown = []; 
+        let prevMax = 0; 
+        for (const tier of tiers) { 
+            if (remaining <= 0) break; 
+            const tierAmount = Math.min(remaining, tier.max - prevMax); 
+            const effectiveRate = baseRate * (1 - tier.discount);  // ✅ 수정됨: * 추가
+            const fee = tierAmount * effectiveRate;                 // ✅ 수정됨: * 추가
+            if (tierAmount > 0) { 
+                breakdown.push({ name: tier.name, amount: tierAmount, baseRate: baseRate, discount: tier.discount, effectiveRate: effectiveRate, fee: fee }); 
+                totalFee += fee; 
+                remaining -= tierAmount; 
+            } 
+            prevMax = tier.max; 
+        } 
+        return { totalFee, breakdown, effectiveRate: totalFee / amount }; 
+    }
+
+    function calculate() { 
+        const monthlyAmount = parseNumber(document.getElementById('monthlyAmount').value); 
+        const useComposite = document.getElementById('useComposite').checked; 
+        if (monthlyAmount <= 0) { 
+            alert('월 거래액을 입력해주세요.'); 
+            return; 
+        } 
+        document.getElementById('resultSection').classList.remove('hidden'); 
+        const oldResult = calculateOldTier(monthlyAmount); 
+        document.getElementById('oldTierFee').textContent = formatCurrency(oldResult.totalFee); 
+        document.getElementById('oldTierRate').textContent = '실효 수수료율: ' + formatPercent(oldResult.effectiveRate); 
+        const oldTableBody = document.querySelector('#oldTierTable tbody'); 
+        oldTableBody.innerHTML = oldResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.rate)+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>'+formatPercent(oldResult.effectiveRate)+'</td><td>'+formatCurrency(oldResult.totalFee)+'</td></tr>'; 
+        const newResult = calculateNewTier(monthlyAmount, 0.05); 
+        document.getElementById('newTierFee').textContent = formatCurrency(newResult.totalFee); 
+        document.getElementById('newTierRate').textContent = '실효 수수료율: ' + formatPercent(newResult.effectiveRate); 
+        const newTableBody = document.querySelector('#newTierTable tbody'); 
+        newTableBody.innerHTML = newResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.effectiveRate)+(row.discount > 0 ? ' ('+(row.discount*100)+'% 할인)' : '')+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>'+formatPercent(newResult.effectiveRate)+'</td><td>'+formatCurrency(newResult.totalFee)+'</td></tr>'; 
+        let compositeResult = null; 
+        if (useComposite) { 
+            compositeResult = calculateNewTier(monthlyAmount, selectedRate); 
+            document.getElementById('compositeLabel').textContent = '개편 복합 적용 (기본 '+(selectedRate*100)+'% + 구간별 할인)'; 
+            document.getElementById('compositeFee').textContent = formatCurrency(compositeResult.totalFee); 
+            document.getElementById('compositeRate').textContent = '실효 수수료율: ' + formatPercent(compositeResult.effectiveRate); 
+            document.getElementById('compositeTableTitle').textContent = '개편 복합 적용 (기본 수수료율: '+(selectedRate*100)+'% - '+selectedRateLabel+')'; 
+            document.getElementById('compositeInfo').innerHTML = '<strong>선택한 기본 수수료율:</strong> '+(selectedRate*100)+'% ('+selectedRateLabel+') → 구간별 추가 할인 적용'; 
+            const compositeTableBody = document.querySelector('#compositeTable tbody'); 
+            compositeTableBody.innerHTML = compositeResult.breakdown.map(row => '<tr><td>'+row.name+'</td><td>'+formatCurrency(row.amount)+'</td><td>'+formatPercent(row.baseRate)+'</td><td>'+(row.discount > 0 ? (row.discount*100)+'% 할인' : '할인 없음')+'</td><td>'+formatPercent(row.effectiveRate)+'</td><td>'+formatCurrency(row.fee)+'</td></tr>').join('') + '<tr><td>합계</td><td>'+formatCurrency(monthlyAmount)+'</td><td>-</td><td>-</td><td>'+formatPercent(compositeResult.effectiveRate)+'</td><td>'+formatCurrency(compositeResult.totalFee)+'</td></tr>'; 
+            document.getElementById('compositeFeeCard').classList.remove('hidden'); 
+            document.getElementById('compositeSection').classList.remove('hidden'); 
+        } else { 
+            document.getElementById('compositeLabel').textContent = '개편 복합 적용'; 
+            document.getElementById('compositeFee').textContent = '-'; 
+            document.getElementById('compositeRate').textContent = '복합 적용 체크 필요'; 
+            document.getElementById('compositeInfo').textContent = '복합 적용을 체크하면 상세 내역이 표시됩니다.'; 
+            document.querySelector('#compositeTable tbody').innerHTML = ''; 
+        } 
+        const baseFee = monthlyAmount * 0.05;                     // ✅ 수정됨: * 추가
+        const bestFee = compositeResult ? compositeResult.totalFee : newResult.totalFee; 
+        const savings = baseFee - bestFee; 
+        const savingsPercent = (savings / baseFee * 100).toFixed(1);  // ✅ 수정됨: * 추가
+        document.getElementById('savingsBadge').textContent = '기존 5% 단일 적용 대비 ' + formatCurrency(savings) + ' 절감 (' + savingsPercent + '%)'; 
+        generateCustomerOutput(monthlyAmount, oldResult, newResult, compositeResult, useComposite); 
+        document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' }); 
+    }
+
+    function generateCustomerOutput(monthly, oldResult, newResult, compositeResult, useComposite) { 
+        const baseFee = monthly * 0.05; 
+        let output = 'Liveklass 수수료 안내\\n\\n월 거래액: ' + formatCurrency(monthly); 
+        if (useComposite && compositeResult) { 
+            output += '\\n\\n적용 기본 수수료율: ' + (selectedRate * 100) + '% (' + selectedRateLabel + ')'; 
+        } 
+        output += '\\n\\n수수료 비교\\n\\n기본 5% 적용: ' + formatCurrency(baseFee) + '\\n\\n구간별 할인: ' + formatCurrency(newResult.totalFee); 
+        if (useComposite && compositeResult) { 
+            output += '\\n\\n복합 적용: ' + formatCurrency(compositeResult.totalFee); 
+            const savings = baseFee - compositeResult.totalFee; 
+            output += '\\n\\n절감 효과: 월 ' + formatCurrency(savings) + ' (연 ' + formatCurrency(savings * 12) + ')'; 
+        } else { 
+            const savings = baseFee - newResult.totalFee; 
+            output += '\\n\\n절감 효과: 월 ' + formatCurrency(savings) + ' (연 ' + formatCurrency(savings * 12) + ')'; 
+        } 
+        document.getElementById('customerOutput').innerHTML = '<button class="copy-btn" onclick="copyToClipboard()">복사</button>' + output; 
+    }
+
+    function copyToClipboard() { 
+        const output = document.getElementById('customerOutput').textContent.replace('복사', '').trim(); 
+        navigator.clipboard.writeText(output).then(() => { 
+            const btn = document.querySelector('.copy-btn'); 
+            btn.textContent = '복사됨!'; 
+            setTimeout(() => btn.textContent = '복사', 2000); 
+        }); 
+    }
+</script>
 </body>
 </html>
